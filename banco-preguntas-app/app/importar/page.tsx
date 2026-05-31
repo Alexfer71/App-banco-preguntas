@@ -11,6 +11,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 
 type QuestionRow = {
   pregunta: string;
@@ -18,6 +19,7 @@ type QuestionRow = {
   opcion_b: string;
   opcion_c: string;
   opcion_d: string;
+  opcion_e?: string;
   respuesta_correcta: string;
   explicacion?: string;
   tema?: string;
@@ -27,6 +29,9 @@ export default function ImportarPage() {
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankDescription, setBankDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -91,6 +96,7 @@ export default function ImportarPage() {
       opcion_b: String(row.opcion_b || "").trim(),
       opcion_c: String(row.opcion_c || "").trim(),
       opcion_d: String(row.opcion_d || "").trim(),
+      opcion_e: String(row.opcion_e || "").trim(),
       respuesta_correcta: String(row.respuesta_correcta || "")
         .trim()
         .toUpperCase(),
@@ -105,17 +111,96 @@ export default function ImportarPage() {
         row.opcion_b &&
         row.opcion_c &&
         row.opcion_d &&
-        row.respuesta_correcta
+        ["A", "B", "C", "D", "E"].includes(row.respuesta_correcta)
     );
 
     if (validRows.length === 0) {
       setError(
-        "No se encontraron preguntas válidas. Revisa que el archivo tenga las columnas correctas."
+        "No se encontraron preguntas válidas. Revisa que el archivo tenga las columnas pregunta, opcion_a, opcion_b, opcion_c, opcion_d y respuesta_correcta con valores A, B, C, D o E."
       );
       return;
     }
 
     setQuestions(validRows);
+  };
+
+  const handleSaveBank = async () => {
+    if (questions.length === 0) {
+      setError("Primero debes cargar un archivo con preguntas válidas.");
+      return;
+    }
+
+    if (!bankName.trim()) {
+      setError("Escribe un nombre para el banco de preguntas.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setIsSaving(false);
+      setError("Debes iniciar sesión para guardar el banco.");
+      return;
+    }
+
+    const { data: bank, error: bankError } = await supabase
+      .from("question_banks")
+      .insert({
+        user_id: user.id,
+        name: bankName.trim(),
+        description: bankDescription.trim() || null,
+      })
+      .select("id")
+      .single();
+
+    if (bankError || !bank) {
+      console.error(bankError);
+      setIsSaving(false);
+      setError("No se pudo crear el banco de preguntas.");
+      return;
+    }
+
+    const questionsToInsert = questions.map((question) => ({
+      bank_id: bank.id,
+      user_id: user.id,
+      question_text: question.pregunta,
+      option_a: question.opcion_a,
+      option_b: question.opcion_b,
+      option_c: question.opcion_c,
+      option_d: question.opcion_d,
+      option_e: question.opcion_e || null,
+      correct_answer: question.respuesta_correcta,
+      explanation: question.explicacion || null,
+      topic: question.tema || null,
+      difficulty: "normal",
+    }));
+
+    const { error: questionsError } = await supabase
+      .from("questions")
+      .insert(questionsToInsert);
+
+    if (questionsError) {
+      console.error(questionsError);
+      setIsSaving(false);
+      setError(
+        "El banco se creó, pero ocurrió un error al guardar las preguntas."
+      );
+      return;
+    }
+
+    setIsSaving(false);
+    alert("Banco guardado correctamente.");
+
+    setQuestions([]);
+    setFileName("");
+    setBankName("");
+    setBankDescription("");
   };
 
   const incompleteQuestions = questions.filter(
@@ -195,6 +280,33 @@ export default function ImportarPage() {
               </div>
             )}
 
+            <div className="mt-5 space-y-3">
+              <div>
+                <label className="text-sm font-black text-slate-700">
+                  Nombre del banco
+                </label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={(event) => setBankName(event.target.value)}
+                  placeholder="Ejemplo: Banco de cultura general"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-black text-slate-700">
+                  Descripción
+                </label>
+                <textarea
+                  value={bankDescription}
+                  onChange={(event) => setBankDescription(event.target.value)}
+                  placeholder="Ejemplo: Preguntas para practicar antes del examen"
+                  className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-400"
+                />
+              </div>
+            </div>
+
             {error && (
               <div className="mt-5 flex gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700">
                 <AlertCircle className="shrink-0" size={20} />
@@ -265,8 +377,12 @@ export default function ImportarPage() {
                 </p>
               </div>
 
-              <button className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:scale-[1.02]">
-                Guardar banco
+              <button
+                onClick={handleSaveBank}
+                disabled={isSaving}
+                className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving ? "Guardando..." : "Guardar banco"}
               </button>
             </div>
 

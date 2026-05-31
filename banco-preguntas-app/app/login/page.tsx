@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -37,13 +37,12 @@ export default function LoginPage() {
         return;
       }
 
-      setMessage(
-        "Cuenta creada. Revisa tu correo si Supabase solicita confirmación."
-      );
+      setMessage("Cuenta creada. Ahora intenta iniciar sesión.");
+      setMode("login");
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -51,7 +50,13 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
+      console.error("Error login:", error);
       setError(error.message);
+      return;
+    }
+
+    if (!data.session) {
+      setError("No se pudo iniciar sesión. Revisa si el correo necesita confirmación.");
       return;
     }
 
@@ -95,9 +100,11 @@ export default function LoginPage() {
             <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500">
               Acceso
             </p>
+
             <h2 className="mt-2 text-3xl font-black tracking-tight">
               {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </h2>
+
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {mode === "login"
                 ? "Entra con tu correo y contraseña para acceder a tu banco personal."
@@ -108,7 +115,11 @@ export default function LoginPage() {
           <div className="mb-5 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => setMode("login")}
+              onClick={() => {
+                setMode("login");
+                setError("");
+                setMessage("");
+              }}
               className={`rounded-full px-4 py-2 text-sm font-black transition ${
                 mode === "login"
                   ? "bg-white text-violet-700 shadow-sm"
@@ -120,7 +131,11 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => setMode("register")}
+              onClick={() => {
+                setMode("register");
+                setError("");
+                setMessage("");
+              }}
               className={`rounded-full px-4 py-2 text-sm font-black transition ${
                 mode === "register"
                   ? "bg-white text-violet-700 shadow-sm"
@@ -137,6 +152,7 @@ export default function LoginPage() {
 
               <div className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3">
                 <Mail size={19} className="text-slate-400" />
+
                 <input
                   type="email"
                   required
@@ -155,6 +171,7 @@ export default function LoginPage() {
 
               <div className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3">
                 <LockKeyhole size={19} className="text-slate-400" />
+
                 <input
                   type="password"
                   required
