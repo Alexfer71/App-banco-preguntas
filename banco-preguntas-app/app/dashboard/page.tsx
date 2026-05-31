@@ -31,42 +31,72 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadDashboard = async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+  let mounted = true;
 
-      if (userError || !user) {
-        router.replace("/login");
-        return;
-      }
+  const loadDashboard = async () => {
+    setLoading(true);
 
-      setEmail(user.email || "");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      const { data, error } = await supabase
-        .from("question_banks")
-        .select("id, name, description, total_questions, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+    if (!mounted) return;
 
-      if (error) {
-        console.error("Error al cargar bancos:", error);
-        setBanks([]);
-      } else {
-        setBanks(data || []);
-      }
-
+    if (!session?.user) {
       setLoading(false);
-    };
+      router.replace("/login");
+      return;
+    }
 
-    loadDashboard();
+    const user = session.user;
+    setEmail(user.email || "");
+
+    const { data, error } = await supabase
+      .from("question_banks")
+      .select("id, name, description, total_questions, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (!mounted) return;
+
+    if (error) {
+      console.error("Error al cargar bancos:", error);
+      setBanks([]);
+    } else {
+      setBanks(data || []);
+    }
+
+    setLoading(false);
+  };
+
+  loadDashboard();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session) {
+      setEmail("");
+      setBanks([]);
+      router.replace("/login");
+    }
+  });
+
+  window.addEventListener("focus", loadDashboard);
+  window.addEventListener("pageshow", loadDashboard);
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+    window.removeEventListener("focus", loadDashboard);
+    window.removeEventListener("pageshow", loadDashboard);
+  };
   }, [router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace("/login");
   };
+
   const totalQuestions = banks.reduce(
     (total, bank) => total + (bank.total_questions || 0),
     0
@@ -86,7 +116,7 @@ export default function DashboardPage() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Sesión iniciada como: {email}
+              Sesión iniciada como: {email || "cargando..."}
             </p>
           </div>
 
