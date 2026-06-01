@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -26,7 +26,25 @@ type Question = {
   topic: string | null;
 };
 
-export default function CrearSimulacroPage() {
+  export default function CrearSimulacroPage() {
+    return (
+      <Suspense
+        fallback={
+          <main className="min-h-screen bg-[#fbfcff] flex items-center justify-center">
+            <div className="rounded-2xl bg-white px-8 py-6 shadow-xl">
+              <p className="text-lg font-black text-indigo-600">
+                Cargando simulacro...
+              </p>
+            </div>
+          </main>
+        }
+      >
+        <CrearSimulacroContent />
+      </Suspense>
+    );
+  }
+
+  function CrearSimulacroContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const bankId = searchParams.get("bankId");
