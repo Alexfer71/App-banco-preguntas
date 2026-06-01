@@ -9,6 +9,10 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowLeft,
+  Sparkles,
+  Database,
+  FileText,
+  Save,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -40,98 +44,47 @@ export default function ImportarPage() {
 
     if (!file) return;
 
-    setFileName(file.name);
     setError("");
-    setQuestions([]);
+    setFileName(file.name);
 
     const extension = file.name.split(".").pop()?.toLowerCase();
 
-    if (extension === "xlsx" || extension === "xls") {
-      readExcelFile(file);
-      return;
-    }
-
-    if (extension === "csv") {
-      readCsvFile(file);
-      return;
-    }
-
-    setError("Formato no permitido. Usa un archivo Excel (.xlsx) o CSV.");
-  };
-
-  const readExcelFile = async (file: File) => {
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      if (extension === "csv") {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            setQuestions(results.data as QuestionRow[]);
+          },
+        });
+      } else if (extension === "xlsx" || extension === "xls") {
+        const data = await file.arrayBuffer();
 
-      const jsonData = XLSX.utils.sheet_to_json<QuestionRow>(worksheet, {
-        defval: "",
-      });
+        const workbook = XLSX.read(data);
 
-      validateAndSetQuestions(jsonData);
-    } catch {
-      setError("No se pudo leer el archivo Excel.");
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        const jsonData = XLSX.utils.sheet_to_json<QuestionRow>(worksheet);
+
+        setQuestions(jsonData);
+      } else {
+        setError("Formato no soportado.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error al leer el archivo.");
     }
   };
 
-  const readCsvFile = (file: File) => {
-    Papa.parse<QuestionRow>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (result) => {
-        validateAndSetQuestions(result.data);
-      },
-      error: () => {
-        setError("No se pudo leer el archivo CSV.");
-      },
-    });
-  };
-
-  const validateAndSetQuestions = (rows: QuestionRow[]) => {
-    const cleanedRows = rows.map((row) => ({
-      pregunta: String(row.pregunta || "").trim(),
-      opcion_a: String(row.opcion_a || "").trim(),
-      opcion_b: String(row.opcion_b || "").trim(),
-      opcion_c: String(row.opcion_c || "").trim(),
-      opcion_d: String(row.opcion_d || "").trim(),
-      opcion_e: String(row.opcion_e || "").trim(),
-      respuesta_correcta: String(row.respuesta_correcta || "")
-        .trim()
-        .toUpperCase(),
-      explicacion: String(row.explicacion || "").trim(),
-      tema: String(row.tema || "").trim(),
-    }));
-
-    const validRows = cleanedRows.filter(
-      (row) =>
-        row.pregunta &&
-        row.opcion_a &&
-        row.opcion_b &&
-        row.opcion_c &&
-        row.opcion_d &&
-        ["A", "B", "C", "D", "E"].includes(row.respuesta_correcta)
-    );
-
-    if (validRows.length === 0) {
-      setError(
-        "No se encontraron preguntas válidas. Revisa que el archivo tenga las columnas pregunta, opcion_a, opcion_b, opcion_c, opcion_d y respuesta_correcta con valores A, B, C, D o E."
-      );
-      return;
-    }
-
-    setQuestions(validRows);
-  };
-
-  const handleSaveBank = async () => {
-    if (questions.length === 0) {
-      setError("Primero debes cargar un archivo con preguntas válidas.");
-      return;
-    }
-
+  const saveQuestions = async () => {
     if (!bankName.trim()) {
-      setError("Escribe un nombre para el banco de preguntas.");
+      setError("Debes colocar un nombre para el banco.");
+      return;
+    }
+
+    if (questions.length === 0) {
+      setError("No hay preguntas para guardar.");
       return;
     }
 
@@ -139,298 +92,303 @@ export default function ImportarPage() {
     setError("");
 
     const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    if (userError || !user) {
+    if (!session?.user) {
+      setError("Debes iniciar sesión.");
       setIsSaving(false);
-      setError("Debes iniciar sesión para guardar el banco.");
       return;
     }
 
-    const { data: bank, error: bankError } = await supabase
+    const userId = session.user.id;
+
+    const { data: bankData, error: bankError } = await supabase
       .from("question_banks")
       .insert({
-        user_id: user.id,
-        name: bankName.trim(),
-        description: bankDescription.trim() || null,
+        user_id: userId,
+        name: bankName,
+        description: bankDescription,
+        total_questions: questions.length,
       })
-      .select("id")
+      .select()
       .single();
 
-    if (bankError || !bank) {
+    if (bankError || !bankData) {
       console.error(bankError);
+      setError("Error al crear el banco.");
       setIsSaving(false);
-      setError("No se pudo crear el banco de preguntas.");
       return;
     }
 
-    const questionsToInsert = questions.map((question) => ({
-      bank_id: bank.id,
-      user_id: user.id,
+    const formattedQuestions = questions.map((question) => ({
+      user_id: userId,
+      bank_id: bankData.id,
       question_text: question.pregunta,
       option_a: question.opcion_a,
       option_b: question.opcion_b,
       option_c: question.opcion_c,
       option_d: question.opcion_d,
-      option_e: question.opcion_e || null,
+      option_e: question.opcion_e || "",
       correct_answer: question.respuesta_correcta,
-      explanation: question.explicacion || null,
-      topic: question.tema || null,
-      difficulty: "normal",
+      explanation: question.explicacion || "",
+      topic: question.tema || "",
     }));
 
     const { error: questionsError } = await supabase
       .from("questions")
-      .insert(questionsToInsert);
+      .insert(formattedQuestions);
 
     if (questionsError) {
       console.error(questionsError);
+      setError("Error al guardar preguntas.");
       setIsSaving(false);
-      setError(
-        "El banco se creó, pero ocurrió un error al guardar las preguntas."
-      );
       return;
     }
 
-    setIsSaving(false);
     alert("Banco guardado correctamente.");
 
     setQuestions([]);
     setFileName("");
     setBankName("");
     setBankDescription("");
+    setIsSaving(false);
   };
 
-  const incompleteQuestions = questions.filter(
-    (question) =>
-      !question.pregunta ||
-      !question.opcion_a ||
-      !question.opcion_b ||
-      !question.opcion_c ||
-      !question.opcion_d ||
-      !question.respuesta_correcta
-  ).length;
-
   return (
-    <main className="min-h-screen bg-[#f8f7ff] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <header className="flex flex-col gap-4 rounded-[2rem] border border-white/70 bg-white/80 p-5 shadow-xl shadow-violet-100/70 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <Link
-              href="/"
-              className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-violet-600 transition hover:text-violet-800"
-            >
-              <ArrowLeft size={17} />
-              Volver al inicio
-            </Link>
-
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500">
-              Importador
-            </p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight">
-              Importar banco de preguntas
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Sube un archivo Excel o CSV con tus preguntas. La app leerá las
-              columnas y mostrará una vista previa antes de guardar.
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 p-4 text-white shadow-lg shadow-violet-200">
-            <FileSpreadsheet size={34} />
-          </div>
-        </header>
-
-        <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-lg shadow-violet-200">
-              <Upload size={30} />
+    <main className="min-h-screen bg-[#fbfcff] text-[#081038]">
+      <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <section className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 rotate-[-8deg] items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+              <Database size={24} />
             </div>
 
-            <h2 className="mt-5 text-2xl font-black">Subir archivo</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Por ahora trabajaremos con archivos Excel o CSV. Para que la app
-              detecte todo bien, el archivo debe tener columnas con nombres
-              específicos.
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">
+                Importar preguntas
+              </h1>
+              <p className="hidden text-xs font-bold text-slate-500 sm:block">
+                Banco de estudio
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={17} />
+            Dashboard
+          </Link>
+        </section>
+      </nav>
+
+      <section className="mx-auto max-w-7xl px-5 py-8">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-600">
+              <Sparkles size={17} />
+              Importación inteligente
+            </div>
+
+            <h2 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">
+              Importa tus
+              <br />
+              preguntas fácilmente.
+            </h2>
+
+            <p className="mt-5 max-w-xl text-sm font-medium leading-6 text-slate-600 sm:text-base">
+              Sube archivos Excel o CSV con tus preguntas y crea bancos
+              organizados para practicar con simulacros y flashcards.
             </p>
 
-            <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-violet-300 bg-violet-50/70 px-5 py-10 text-center transition hover:bg-violet-100">
-              <Upload className="mb-3 text-violet-600" size={34} />
-              <span className="font-black text-violet-700">
-                Seleccionar archivo
-              </span>
-              <span className="mt-1 text-xs font-semibold text-slate-500">
-                Formatos permitidos: .xlsx, .xls, .csv
-              </span>
-
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              <InfoCard
+                icon={<FileSpreadsheet size={24} />}
+                title="Excel y CSV"
+                text="Compatible con formatos .xlsx, .xls y .csv"
+                color="bg-blue-100 text-blue-600"
               />
-            </label>
 
-            {fileName && (
-              <div className="mt-5 rounded-2xl bg-slate-100 p-4 text-sm">
-                <p className="font-black text-slate-700">Archivo cargado</p>
-                <p className="mt-1 break-all text-slate-500">{fileName}</p>
-              </div>
-            )}
+              <InfoCard
+                icon={<CheckCircle2 size={24} />}
+                title="Vista previa"
+                text="Revisa las preguntas antes de guardar."
+                color="bg-emerald-100 text-emerald-600"
+              />
 
-            <div className="mt-5 space-y-3">
-              <div>
-                <label className="text-sm font-black text-slate-700">
+              <InfoCard
+                icon={<Upload size={24} />}
+                title="Carga rápida"
+                text="Sube cientos de preguntas fácilmente."
+                color="bg-violet-100 text-violet-600"
+              />
+
+              <InfoCard
+                icon={<FileText size={24} />}
+                title="Organización"
+                text="Clasifica preguntas por temas y bancos."
+                color="bg-yellow-100 text-yellow-600"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
+            <div className="mb-6">
+              <p className="text-sm font-black text-indigo-600">
+                Nuevo banco
+              </p>
+
+              <h2 className="mt-2 text-3xl font-black tracking-tight">
+                Subir archivo
+              </h2>
+
+              <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
+                Selecciona tu archivo y completa la información del banco.
+              </p>
+            </div>
+
+            <div className="grid gap-5">
+              <label className="grid gap-2">
+                <span className="text-sm font-black text-slate-700">
                   Nombre del banco
-                </label>
+                </span>
+
                 <input
                   type="text"
                   value={bankName}
-                  onChange={(event) => setBankName(event.target.value)}
-                  placeholder="Ejemplo: Banco de cultura general"
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-400"
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="Ej: Anatomía, Historia..."
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-indigo-400"
                 />
-              </div>
+              </label>
 
-              <div>
-                <label className="text-sm font-black text-slate-700">
+              <label className="grid gap-2">
+                <span className="text-sm font-black text-slate-700">
                   Descripción
-                </label>
+                </span>
+
                 <textarea
+                  rows={4}
                   value={bankDescription}
-                  onChange={(event) => setBankDescription(event.target.value)}
-                  placeholder="Ejemplo: Preguntas para practicar antes del examen"
-                  className="mt-2 min-h-24 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-400"
+                  onChange={(e) => setBankDescription(e.target.value)}
+                  placeholder="Describe este banco de preguntas..."
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-indigo-400"
                 />
-              </div>
-            </div>
+              </label>
 
-            {error && (
-              <div className="mt-5 flex gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700">
-                <AlertCircle className="shrink-0" size={20} />
-                <p className="font-semibold">{error}</p>
-              </div>
-            )}
-          </div>
+              <label className="group cursor-pointer rounded-[2rem] border-2 border-dashed border-indigo-200 bg-indigo-50/40 p-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50">
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
 
-          <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
-            <h2 className="text-2xl font-black">Formato requerido</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Tu archivo debe tener estas columnas. Es importante respetar los
-              nombres para que el importador pueda leer el banco.
-            </p>
-
-            <div className="mt-5 overflow-x-auto rounded-3xl border">
-              <table className="w-full min-w-[700px] text-left text-sm">
-                <thead className="bg-slate-950 text-white">
-                  <tr>
-                    <th className="px-4 py-3">pregunta</th>
-                    <th className="px-4 py-3">opcion_a</th>
-                    <th className="px-4 py-3">opcion_b</th>
-                    <th className="px-4 py-3">opcion_c</th>
-                    <th className="px-4 py-3">opcion_d</th>
-                    <th className="px-4 py-3">respuesta_correcta</th>
-                    <th className="px-4 py-3">tema</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-white">
-                    <td className="px-4 py-3">¿Capital de Ecuador?</td>
-                    <td className="px-4 py-3">Quito</td>
-                    <td className="px-4 py-3">Guayaquil</td>
-                    <td className="px-4 py-3">Cuenca</td>
-                    <td className="px-4 py-3">Loja</td>
-                    <td className="px-4 py-3 font-black text-emerald-600">
-                      A
-                    </td>
-                    <td className="px-4 py-3">Cultura general</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <InfoBox title="Detectadas" value={questions.length} />
-              <InfoBox title="Incompletas" value={incompleteQuestions} />
-              <InfoBox
-                title="Estado"
-                value={questions.length > 0 ? "Listo" : "Pendiente"}
-              />
-            </div>
-          </div>
-        </section>
-
-        {questions.length > 0 && (
-          <section className="rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-black text-emerald-700">
-                  <CheckCircle2 size={17} />
-                  Preguntas detectadas correctamente
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+                  <Upload size={28} />
                 </div>
 
-                <h2 className="text-2xl font-black">Vista previa</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Mostrando las primeras preguntas leídas del archivo.
+                <h3 className="mt-5 text-xl font-black">
+                  Seleccionar archivo
+                </h3>
+
+                <p className="mt-2 text-sm font-medium text-slate-500">
+                  Haz clic para subir un archivo Excel o CSV.
                 </p>
-              </div>
+
+                {fileName && (
+                  <div className="mt-5 rounded-2xl bg-white px-4 py-3 text-sm font-black text-indigo-600 shadow-sm">
+                    {fileName}
+                  </div>
+                )}
+              </label>
+
+              {error && (
+                <div className="flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">
+                  <AlertCircle size={20} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {questions.length > 0 && (
+                <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+                  Se cargaron correctamente {questions.length} preguntas.
+                </div>
+              )}
 
               <button
-                onClick={handleSaveBank}
+                onClick={saveQuestions}
                 disabled={isSaving}
-                className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
               >
+                <Save size={18} />
+
                 {isSaving ? "Guardando..." : "Guardar banco"}
               </button>
             </div>
+          </div>
+        </div>
 
-            <div className="overflow-x-auto rounded-3xl border">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-slate-950 text-white">
+        {questions.length > 0 && (
+          <section className="mt-8 rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-indigo-600">
+                  Vista previa
+                </p>
+
+                <h2 className="mt-1 text-3xl font-black tracking-tight">
+                  Preguntas detectadas
+                </h2>
+              </div>
+
+              <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-600">
+                {questions.length} preguntas
+              </span>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="min-w-full overflow-hidden rounded-3xl border border-slate-200">
+                <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-3">#</th>
-                    <th className="px-4 py-3">Pregunta</th>
-                    <th className="px-4 py-3">A</th>
-                    <th className="px-4 py-3">B</th>
-                    <th className="px-4 py-3">C</th>
-                    <th className="px-4 py-3">D</th>
-                    <th className="px-4 py-3">Correcta</th>
-                    <th className="px-4 py-3">Tema</th>
+                    <th className="px-5 py-4 text-left text-sm font-black text-slate-700">
+                      Pregunta
+                    </th>
+
+                    <th className="px-5 py-4 text-left text-sm font-black text-slate-700">
+                      Respuesta
+                    </th>
+
+                    <th className="px-5 py-4 text-left text-sm font-black text-slate-700">
+                      Tema
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {questions.slice(0, 20).map((question, index) => (
+                  {questions.slice(0, 10).map((question, index) => (
                     <tr
-                      key={`${question.pregunta}-${index}`}
-                      className="border-t bg-white"
+                      key={index}
+                      className="border-t border-slate-100 bg-white"
                     >
-                      <td className="px-4 py-3 font-black">{index + 1}</td>
-                      <td className="max-w-[320px] px-4 py-3">
+                      <td className="px-5 py-4 text-sm font-medium text-slate-700">
                         {question.pregunta}
                       </td>
-                      <td className="px-4 py-3">{question.opcion_a}</td>
-                      <td className="px-4 py-3">{question.opcion_b}</td>
-                      <td className="px-4 py-3">{question.opcion_c}</td>
-                      <td className="px-4 py-3">{question.opcion_d}</td>
-                      <td className="px-4 py-3 font-black text-emerald-600">
+
+                      <td className="px-5 py-4 text-sm font-black text-indigo-600">
                         {question.respuesta_correcta}
                       </td>
-                      <td className="px-4 py-3">{question.tema || "-"}</td>
+
+                      <td className="px-5 py-4 text-sm font-medium text-slate-500">
+                        {question.tema || "Sin tema"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            {questions.length > 20 && (
-              <p className="mt-4 text-sm font-semibold text-slate-500">
-                Se muestran 20 preguntas de {questions.length}. Luego haremos
-                una vista completa con paginación.
-              </p>
-            )}
           </section>
         )}
       </section>
@@ -438,19 +396,30 @@ export default function ImportarPage() {
   );
 }
 
-function InfoBox({
+function InfoCard({
+  icon,
   title,
-  value,
+  text,
+  color,
 }: {
+  icon: React.ReactNode;
   title: string;
-  value: string | number;
+  text: string;
+  color: string;
 }) {
   return (
-    <div className="rounded-3xl bg-slate-100 p-4">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-        {title}
+    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div
+        className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${color}`}
+      >
+        {icon}
+      </div>
+
+      <h4 className="font-black">{title}</h4>
+
+      <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+        {text}
       </p>
-      <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-    </div>
+    </article>
   );
 }

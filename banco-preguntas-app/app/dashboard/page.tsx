@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import {
+  ArrowRight,
   BookOpen,
-  LogOut,
-  Upload,
-  FileText,
-  PlayCircle,
-  Layers,
   Brain,
+  FileQuestion,
+  LogOut,
   PlusCircle,
+  Sparkles,
+  Upload,
+  PlayCircle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,65 +32,64 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  let mounted = true;
+    let mounted = true;
 
-  const loadDashboard = async () => {
-    setLoading(true);
+    const loadDashboard = async () => {
+      setLoading(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+
+      if (!session?.user) {
+        setLoading(false);
+        router.replace("/login");
+        return;
+      }
+
+      setEmail(session.user.email || "");
+
+      const { data, error } = await supabase
+        .from("question_banks")
+        .select("id, name, description, total_questions, created_at")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error("Error al cargar bancos:", error);
+        setBanks([]);
+      } else {
+        setBanks(data || []);
+      }
+
+      setLoading(false);
+    };
+
+    void loadDashboard();
 
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setEmail("");
+        setBanks([]);
+        router.replace("/login");
+      }
+    });
 
-    if (!mounted) return;
+    window.addEventListener("focus", loadDashboard);
+    window.addEventListener("pageshow", loadDashboard);
 
-    if (!session?.user) {
-      setLoading(false);
-      router.replace("/login");
-      return;
-    }
-
-    const user = session.user;
-    setEmail(user.email || "");
-
-    const { data, error } = await supabase
-      .from("question_banks")
-      .select("id, name, description, total_questions, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (!mounted) return;
-
-    if (error) {
-      console.error("Error al cargar bancos:", error);
-      setBanks([]);
-    } else {
-      setBanks(data || []);
-    }
-
-    setLoading(false);
-  };
-
-  loadDashboard();
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!session) {
-      setEmail("");
-      setBanks([]);
-      router.replace("/login");
-    }
-  });
-
-  window.addEventListener("focus", loadDashboard);
-  window.addEventListener("pageshow", loadDashboard);
-
-  return () => {
-    mounted = false;
-    subscription.unsubscribe();
-    window.removeEventListener("focus", loadDashboard);
-    window.removeEventListener("pageshow", loadDashboard);
-  };
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      window.removeEventListener("focus", loadDashboard);
+      window.removeEventListener("pageshow", loadDashboard);
+    };
   }, [router]);
 
   const handleLogout = async () => {
@@ -103,98 +103,115 @@ export default function DashboardPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f8f7ff] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <header className="flex flex-col gap-4 rounded-[2rem] border border-white/70 bg-white/80 p-5 shadow-xl shadow-violet-100/70 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500">
-              Panel personal
-            </p>
-
-            <h1 className="mt-1 text-3xl font-black tracking-tight">
-              Dashboard
-            </h1>
-
-            <p className="mt-2 text-sm text-slate-600">
-              Sesión iniciada como: {email || "cargando..."}
-            </p>
+    <main className="min-h-screen bg-[#fbfcff] text-[#081038]">
+      <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <section className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 rotate-[-8deg] items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">Estudia+</h1>
+              <p className="hidden text-xs font-bold text-slate-500 sm:block">
+                Panel de estudio
+              </p>
+            </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
-            <LogOut size={18} />
-            Cerrar sesión
+            <LogOut size={17} />
+            <span className="hidden sm:inline">Cerrar sesión</span>
           </button>
+        </section>
+      </nav>
+
+      <section className="mx-auto max-w-7xl px-5 py-8">
+        <header className="grid gap-6 lg:grid-cols-[1fr_0.8fr] lg:items-center">
+          <div className="rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-600">
+              <Sparkles size={17} />
+              Bienvenido de nuevo
+            </div>
+
+            <h2 className="text-4xl font-black leading-tight tracking-tight sm:text-5xl">
+              Tu espacio para
+              <br />
+              estudiar{" "}
+              <span className="bg-gradient-to-r from-indigo-500 to-blue-500 bg-clip-text text-transparent">
+                mejor.
+              </span>
+            </h2>
+
+            <p className="mt-4 max-w-2xl text-sm font-medium leading-6 text-slate-600 sm:text-base">
+              Sesión iniciada como{" "}
+              <span className="font-black text-slate-900">
+                {email || "cargando..."}
+              </span>
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/importar"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 transition hover:scale-[1.02]"
+              >
+                <Upload size={18} />
+                Importar banco
+              </Link>
+
+              <Link
+                href="/flashcards"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-4 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
+              >
+                <Brain size={18} />
+                Flashcards
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            <StatCard
+              title="Bancos guardados"
+              value={loading ? "..." : banks.length}
+              icon={<BookOpen size={24} />}
+              color="bg-blue-100 text-blue-600"
+            />
+
+            <StatCard
+              title="Preguntas totales"
+              value={loading ? "..." : totalQuestions}
+              icon={<FileQuestion size={24} />}
+              color="bg-emerald-100 text-emerald-600"
+            />
+
+            <StatCard
+              title="Modo estudio"
+              value="Activo"
+              icon={<Brain size={24} />}
+              color="bg-violet-100 text-violet-600"
+            />
+          </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <Card
-            title="Mis bancos"
-            value={loading ? "..." : banks.length}
-            icon={<BookOpen size={26} />}
-          />
-
-          <Card
-            title="Preguntas"
-            value={loading ? "..." : totalQuestions}
-            icon={<FileText size={26} />}
-          />
-
-          <Card
-            title="Simulacros"
-            value="0"
-            icon={<PlayCircle size={26} />}
-          />
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-4">
-          <ActionCard
-            title="Importar banco"
-            description="Sube preguntas desde un archivo CSV o Excel."
-            href="/importar"
-            icon={<Upload size={24} />}
-            active
-          />
-
-          <ActionCard
-            title="Crear simulacro"
-            description="Genera una práctica con preguntas de tus bancos."
-            href="/simulacros/crear"
-            icon={<PlayCircle size={24} />}
-            active={banks.length > 0}
-          />
-
-          <ActionCard
-            title="Flashcards"
-            description="Estudia las preguntas en modo tarjetas."
-            href="/flashcards"
-            icon={<Brain size={24} />}
-            active={banks.length > 0}
-          />
-
-          <ActionCard
-            title="Mis bancos"
-            description="Revisa, edita o elimina tus bancos guardados."
-            href="/bancos"
-            icon={<Layers size={24} />}
-            active={banks.length > 0}
-          />
-        </section>
-
-        <section className="rounded-[2rem] border border-white/80 bg-white/90 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mt-8 rounded-[2.2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-black">Mis bancos de preguntas</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="text-sm font-black text-indigo-600">
+                Bancos de preguntas
+              </p>
+              <h2 className="mt-1 text-3xl font-black tracking-tight">
+                Mis bancos
+              </h2>
+              <p className="mt-2 text-sm font-medium text-slate-500">
                 Aquí aparecen los bancos que guardaste desde la pantalla de importación.
               </p>
             </div>
 
             <Link
               href="/importar"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:scale-[1.02]"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 transition hover:scale-[1.02]"
             >
               <PlusCircle size={18} />
               Nuevo banco
@@ -202,23 +219,29 @@ export default function DashboardPage() {
           </div>
 
           {loading && (
-            <p className="mt-6 text-sm font-semibold text-slate-500">
-              Cargando bancos...
-            </p>
+            <div className="mt-8 rounded-3xl bg-slate-50 p-8 text-center">
+              <p className="font-black text-slate-500">Cargando bancos...</p>
+            </div>
           )}
 
           {!loading && banks.length === 0 && (
-            <div className="mt-6 rounded-3xl bg-gradient-to-br from-violet-700 via-fuchsia-600 to-orange-400 p-8 text-white shadow-2xl shadow-violet-200">
-              <h3 className="text-3xl font-black">Importa tu primer banco</h3>
+            <div className="mt-8 rounded-[2rem] bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-8 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+                <Upload size={30} />
+              </div>
 
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">
+              <h3 className="mt-5 text-2xl font-black">
+                Importa tu primer banco
+              </h3>
+
+              <p className="mx-auto mt-3 max-w-xl text-sm font-medium leading-6 text-slate-600">
                 Sube un archivo Excel o CSV con tus preguntas. Luego podrás crear
-                simulacros, practicar por temas y estudiar con flashcards.
+                simulacros y estudiar por banco.
               </p>
 
               <Link
                 href="/importar"
-                className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-black text-violet-700 shadow-lg transition hover:scale-[1.02]"
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 transition hover:scale-[1.02]"
               >
                 <Upload size={18} />
                 Importar preguntas
@@ -227,30 +250,32 @@ export default function DashboardPage() {
           )}
 
           {!loading && banks.length > 0 && (
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {banks.map((bank) => (
                 <article
                   key={bank.id}
-                  className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                  className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-                    <BookOpen size={24} />
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+                      <BookOpen size={26} />
+                    </div>
+
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                      {bank.total_questions} preguntas
+                    </span>
                   </div>
 
-                  <h3 className="mt-4 text-lg font-black">{bank.name}</h3>
+                  <h3 className="mt-5 text-xl font-black">{bank.name}</h3>
 
-                  <p className="mt-2 min-h-10 text-sm leading-6 text-slate-500">
+                  <p className="mt-2 min-h-12 text-sm font-medium leading-6 text-slate-500">
                     {bank.description || "Sin descripción"}
                   </p>
 
-                  <div className="mt-4 rounded-2xl bg-slate-100 p-3 text-sm font-black text-slate-700">
-                    {bank.total_questions} preguntas
-                  </div>
-
-                  <div className="mt-4 grid gap-2">
+                  <div className="mt-5 grid gap-3">
                     <Link
                       href={`/simulacros/crear?bankId=${bank.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:scale-[1.01]"
                     >
                       <PlayCircle size={17} />
                       Crear simulacro
@@ -258,7 +283,7 @@ export default function DashboardPage() {
 
                     <Link
                       href={`/flashcards?bankId=${bank.id}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-violet-100 px-4 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-200"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-900 transition hover:bg-slate-50"
                     >
                       <Brain size={17} />
                       Estudiar flashcards
@@ -274,72 +299,29 @@ export default function DashboardPage() {
   );
 }
 
-function Card({
+function StatCard({
   title,
   value,
   icon,
+  color,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
+  color: string;
 }) {
   return (
-    <article className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur">
-      <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-        {icon}
-      </div>
-
-      <p className="text-sm font-black text-slate-500">{title}</p>
-      <p className="mt-2 text-4xl font-black text-slate-950">{value}</p>
-    </article>
-  );
-}
-
-function ActionCard({
-  title,
-  description,
-  href,
-  icon,
-  active,
-}: {
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ReactNode;
-  active: boolean;
-}) {
-  if (!active) {
-    return (
-      <article className="rounded-[2rem] border border-slate-200 bg-white/60 p-5 opacity-60 shadow-sm">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+    <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/70">
+      <div className="flex items-center gap-4">
+        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${color}`}>
           {icon}
         </div>
 
-        <h3 className="mt-4 text-lg font-black text-slate-700">{title}</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
-
-        <p className="mt-4 rounded-full bg-slate-100 px-4 py-2 text-center text-xs font-black text-slate-500">
-          Importa un banco primero
-        </p>
-      </article>
-    );
-  }
-
-  return (
-    <Link
-      href={href}
-      className="rounded-[2rem] border border-white/80 bg-white/90 p-5 shadow-xl shadow-slate-200/70 transition hover:-translate-y-1 hover:shadow-2xl"
-    >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white">
-        {icon}
+        <div>
+          <p className="text-sm font-black text-slate-500">{title}</p>
+          <p className="mt-1 text-3xl font-black text-slate-950">{value}</p>
+        </div>
       </div>
-
-      <h3 className="mt-4 text-lg font-black">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
-
-      <p className="mt-4 rounded-full bg-violet-100 px-4 py-2 text-center text-xs font-black text-violet-700">
-        Abrir
-      </p>
-    </Link>
+    </article>
   );
 }

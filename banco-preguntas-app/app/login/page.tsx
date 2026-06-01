@@ -3,7 +3,19 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
-import { ArrowLeft, LockKeyhole, Mail, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  Brain,
+  CheckCircle2,
+  ClipboardList,
+  LockKeyhole,
+  Mail,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -64,163 +76,220 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f8f7ff] px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
-      <section className="mx-auto grid min-h-[calc(100vh-48px)] max-w-6xl gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-        <div className="rounded-[2.5rem] bg-gradient-to-br from-violet-700 via-fuchsia-600 to-orange-400 p-8 text-white shadow-2xl shadow-violet-200 sm:p-10">
-          <Link
-            href="/"
-            className="mb-8 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-bold text-white backdrop-blur transition hover:bg-white/25"
-          >
-            <ArrowLeft size={17} />
-            Volver al inicio
+    <main className="min-h-screen bg-[#fbfcff] text-[#081038]">
+      <nav className="border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <section className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-11 w-11 rotate-[-8deg] items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg shadow-indigo-200">
+              <BookOpen size={24} />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight">Estudia+</h1>
           </Link>
 
-          <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 backdrop-blur">
-            <Sparkles size={32} />
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={17} />
+            Inicio
+          </Link>
+        </section>
+      </nav>
+
+      <section className="mx-auto grid min-h-[calc(100vh-81px)] max-w-7xl gap-10 px-5 py-10 lg:grid-cols-[1fr_0.85fr] lg:items-center">
+        <div className="order-2 lg:order-1">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-600">
+            <Sparkles size={17} />
+            Acceso a tu espacio de estudio
           </div>
 
-          <h1 className="max-w-xl text-4xl font-black leading-tight tracking-tight sm:text-5xl">
-            Tu banco de preguntas, simulacros y flashcards en un solo lugar.
-          </h1>
+          <h2 className="text-5xl font-black leading-[1.08] tracking-tight sm:text-6xl">
+            Entra y sigue
+            <br />
+            estudiando{" "}
+            <span className="bg-gradient-to-r from-indigo-500 to-blue-500 bg-clip-text text-transparent">
+              mejor.
+            </span>
+          </h2>
 
-          <p className="mt-5 max-w-xl text-base leading-7 text-white/85">
-            Inicia sesión para guardar tus preguntas, crear simulacros y estudiar
-            desde cualquier dispositivo.
+          <p className="mt-6 max-w-xl text-lg font-medium leading-8 text-slate-600">
+            Guarda tus bancos de preguntas, crea simulacros y organiza tus
+            flashcards desde un panel personal, rápido y responsive.
           </p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <MiniCard value="1" label="Cuenta" />
-            <MiniCard value="∞" label="Dispositivos" />
-            <MiniCard value="100%" label="Personal" />
+          <div className="mt-9 grid max-w-2xl gap-4 sm:grid-cols-2">
+            <InfoCard
+              icon={<Upload size={24} />}
+              title="Importa bancos"
+              text="Sube preguntas desde archivos Excel o CSV."
+              color="bg-blue-100 text-blue-600"
+            />
+
+            <InfoCard
+              icon={<ClipboardList size={24} />}
+              title="Simulacros"
+              text="Practica con preguntas de tus bancos guardados."
+              color="bg-emerald-100 text-emerald-600"
+            />
+
+            <InfoCard
+              icon={<Brain size={24} />}
+              title="Flashcards"
+              text="Crea tarjetas para memorizar información."
+              color="bg-violet-100 text-violet-600"
+            />
+
+            <InfoCard
+              icon={<BarChart3 size={24} />}
+              title="Progreso"
+              text="Organiza tu estudio de forma más clara."
+              color="bg-yellow-100 text-yellow-600"
+            />
           </div>
         </div>
 
-        <div className="rounded-[2.5rem] border border-white/80 bg-white/85 p-6 shadow-xl shadow-slate-200/70 backdrop-blur sm:p-8">
-          <div className="mb-6">
-            <p className="text-xs font-black uppercase tracking-[0.25em] text-violet-500">
-              Acceso
-            </p>
+        <div className="order-1 rounded-[2.2rem] border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-200/80 lg:order-2">
+          <div className="rounded-[1.8rem] bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-6 sm:p-8">
+            <div className="mb-7 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-indigo-600">Acceso</p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight">
+                  {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+                </h2>
+                <p className="mt-3 text-sm font-medium leading-6 text-slate-600">
+                  {mode === "login"
+                    ? "Entra con tu correo y contraseña para acceder a tu panel."
+                    : "Crea una cuenta para guardar tu información de estudio."}
+                </p>
+              </div>
 
-            <h2 className="mt-2 text-3xl font-black tracking-tight">
-              {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-            </h2>
+              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-lg sm:flex">
+                <CheckCircle2 size={28} />
+              </div>
+            </div>
 
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {mode === "login"
-                ? "Entra con tu correo y contraseña para acceder a tu banco personal."
-                : "Crea una cuenta para guardar tus preguntas y resultados."}
-            </p>
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                  setMessage("");
+                }}
+                className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+                  mode === "login"
+                    ? "bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-100"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                Iniciar sesión
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                  setMessage("");
+                }}
+                className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+                  mode === "register"
+                    ? "bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-100"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                Crear cuenta
+              </button>
+            </div>
+
+            <form onSubmit={handleAuth} className="grid gap-4">
+              <label className="grid gap-2">
+                <span className="text-sm font-black text-slate-700">Correo</span>
+
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-indigo-400">
+                  <Mail size={19} className="text-slate-400" />
+
+                  <input
+                    type="email"
+                    required
+                    placeholder="tu-correo@ejemplo.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
+                  />
+                </div>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-black text-slate-700">
+                  Contraseña
+                </span>
+
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition focus-within:border-indigo-400">
+                  <LockKeyhole size={19} className="text-slate-400" />
+
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    placeholder="Mínimo 6 caracteres"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
+                  />
+                </div>
+              </label>
+
+              {error && (
+                <div className="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">
+                  {error}
+                </div>
+              )}
+
+              {message && (
+                <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+                  {message}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-2 inline-flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading
+                  ? "Procesando..."
+                  : mode === "login"
+                    ? "Entrar al dashboard"
+                    : "Crear cuenta"}
+                {!loading && <ArrowRight size={18} />}
+              </button>
+            </form>
           </div>
-
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-                setMessage("");
-              }}
-              className={`rounded-full px-4 py-2 text-sm font-black transition ${
-                mode === "login"
-                  ? "bg-white text-violet-700 shadow-sm"
-                  : "text-slate-500"
-              }`}
-            >
-              Iniciar sesión
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setError("");
-                setMessage("");
-              }}
-              className={`rounded-full px-4 py-2 text-sm font-black transition ${
-                mode === "register"
-                  ? "bg-white text-violet-700 shadow-sm"
-                  : "text-slate-500"
-              }`}
-            >
-              Crear cuenta
-            </button>
-          </div>
-
-          <form onSubmit={handleAuth} className="grid gap-4">
-            <label className="grid gap-2">
-              <span className="text-sm font-black text-slate-700">Correo</span>
-
-              <div className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3">
-                <Mail size={19} className="text-slate-400" />
-
-                <input
-                  type="email"
-                  required
-                  placeholder="tu-correo@ejemplo.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="w-full bg-transparent text-sm outline-none"
-                />
-              </div>
-            </label>
-
-            <label className="grid gap-2">
-              <span className="text-sm font-black text-slate-700">
-                Contraseña
-              </span>
-
-              <div className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3">
-                <LockKeyhole size={19} className="text-slate-400" />
-
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="Mínimo 6 caracteres"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full bg-transparent text-sm outline-none"
-                />
-              </div>
-            </label>
-
-            {error && (
-              <div className="rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-700">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="rounded-2xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
-                {message}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-200 transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading
-                ? "Procesando..."
-                : mode === "login"
-                  ? "Entrar"
-                  : "Crear cuenta"}
-            </button>
-          </form>
         </div>
       </section>
     </main>
   );
 }
 
-function MiniCard({ value, label }: { value: string; label: string }) {
+function InfoCard({
+  icon,
+  title,
+  text,
+  color,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+  color: string;
+}) {
   return (
-    <div className="rounded-3xl bg-white/15 p-4 text-center backdrop-blur">
-      <p className="text-2xl font-black">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-white/75">
-        {label}
-      </p>
-    </div>
+    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${color}`}>
+        {icon}
+      </div>
+      <h4 className="font-black">{title}</h4>
+      <p className="mt-2 text-sm font-medium leading-6 text-slate-500">{text}</p>
+    </article>
   );
 }
